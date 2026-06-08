@@ -99,7 +99,10 @@ async def get_todo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Todo not found",
         )
-
+    # Ensure the todo belongs to the current user
+    if todo.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    
     return todo
 
 
@@ -118,7 +121,10 @@ async def update_existing_todo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Todo not found",
         )
-
+    # Ensure the todo belongs to the current user
+    if todo.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    
     update_data = todo_data.model_dump()
 
     if todo_data.completed:
@@ -149,7 +155,10 @@ async def delete_existing_todo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Todo not found",
         )
-
+    # Ensure the todo belongs to the current user
+    if todo.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    
     await delete_todo(db, todo)
 
     return None

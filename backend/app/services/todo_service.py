@@ -28,7 +28,14 @@ async def get_todos(
     limit: int = 20,
 ) -> tuple[list[Todo], int]:
     """Get all todos with pagination for a specific user."""
-    query = select(Todo).where(Todo.user_id == user_id).offset(skip).limit(limit)
+    # Order by completed asc (incomplete first), then created_at desc (newest first)
+    query = (
+    select(Todo)
+    .where(Todo.user_id == user_id)
+    .order_by(Todo.completed.asc(), Todo.created_at.desc())
+    .offset(skip)
+    .limit(limit)
+)
     result = await db.execute(query)
     todos = list(result.scalars().all())
 

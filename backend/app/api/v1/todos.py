@@ -2,6 +2,7 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+import redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -80,9 +81,12 @@ async def create_new_todo(
     todo_data: TodoCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: RedisClient = Depends(get_redis),
 ):
     """Create a new todo item."""
     todo = await create_todo(db, todo_data, current_user.id)
+    # Invalidate user's todo list cache after creating a new todo
+    await redis.delete(f"todos:{current_user.id}:page:1:size:20")
     return todo
 
 
@@ -139,6 +143,9 @@ async def update_existing_todo(
 
     updated_todo = await update_todo(db, todo, {})
 
+    # Invalidate user's todo list cache after updating a todo
+    await redis.delete(f"todos:{current_user.id}:page:1:size:20")
+
     return updated_todo
 
 
@@ -161,5 +168,8 @@ async def delete_existing_todo(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     await delete_todo(db, todo)
+
+    # Invalidate user's todo list cache after deleting a todo
+    await redis.delete(f"todos:{current_user.id}:page:1:size:20")
 
     return None

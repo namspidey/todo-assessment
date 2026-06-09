@@ -32,9 +32,9 @@ interface UpdateTodoRequest {
 }
 
 
-export function useTodos(page: number = 1, size: number = 10000) {
+export function useTodos(page: number = 1, size: number = 20) {
   return useQuery({
-    queryKey: ["todos"],
+    queryKey: ["todos", page, size],
     queryFn: async (): Promise<TodoListResponse> => {
       const response = await api.get("/todos", {
         params: { page, size },
@@ -51,7 +51,7 @@ export function useCreateTodo() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
+      queryClient.invalidateQueries({ queryKey: ["todos"] , exact: false })
       toast.success("Todo created successfully!");
     },
     onError: () => {
@@ -75,14 +75,14 @@ export function useUpdateTodo() {
     },
     onMutate: async ({ id, data }) => {
       // Cancel outgoing queries
-      await queryClient.cancelQueries({ queryKey: ["todos"] });
+      await queryClient.cancelQueries({ queryKey: ["todos"], exact: false });
 
       // Snapshot previous value
-      const previousTodos = queryClient.getQueryData<TodoListResponse>(["todos"]);
+      const previousTodos = queryClient.getQueryData<TodoListResponse>(["todos", 1, 20]);
 
       // Optimistically update
       if (previousTodos) {
-        queryClient.setQueryData<TodoListResponse>(["todos"], {
+        queryClient.setQueryData<TodoListResponse>(["todos", 1, 20], {
           ...previousTodos,
           items: previousTodos.items.map((todo) =>
             todo.id === id ? { ...todo, ...data } : todo
@@ -96,7 +96,7 @@ export function useUpdateTodo() {
       toast.error("Failed to update todo");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
+      queryClient.invalidateQueries({ queryKey: ["todos"], exact: false });
     },
   });
 }
@@ -107,7 +107,7 @@ export function useDeleteTodo() {
       await api.delete(`/todos/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
+      queryClient.invalidateQueries({ queryKey: ["todos"] , exact: false })
       toast.success("Todo deleted successfully!");
     },
     onError: () => {

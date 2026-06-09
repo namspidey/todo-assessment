@@ -1,8 +1,11 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from app.models.tag import TodoTag
 from app.models.todo import Todo
 from app.schemas.todo import TodoCreate
 
@@ -26,28 +29,67 @@ async def get_todos(
     user_id: uuid.UUID,
     skip: int = 0,
     limit: int = 20,
+    status: str | None = None,
+    tag_id: uuid.UUID | None = None,
+    keyword: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
 ) -> tuple[list[Todo], int]:
-    """Get all todos with pagination for a specific user."""
-    # Order by completed asc (incomplete first), then created_at desc (newest first)
+    """Get todos with filtering and pagination for a specific user."""
+    filters = [Todo.user_id == user_id]
+
+    # Filter by status
+    if status == "completed":
+        filters.append(Todo.completed == True)  # noqa: E712
+    elif status == "active":
+        filters.append(Todo.completed == False)  # noqa: E712
+
+    # Filter by keyword (title search)
+    if keyword:
+        filters.append(Todo.title.ilike(f"%{keyword}%"))
+
+    # Filter by date range
+    if date_from:
+        filters.append(Todo.created_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        filters.append(Todo.created_at <= datetime.fromisoformat(date_to))
+
+    # Filter by tag
+    if tag_id:
+        filters.append(
+            Todo.id.in_(
+                select(TodoTag.todo_id).where(TodoTag.tag_id == tag_id)
+            )
+        )
+
     query = (
-    select(Todo)
-    .where(Todo.user_id == user_id)
-    .order_by(Todo.completed.asc(), Todo.created_at.desc())
-    .offset(skip)
-    .limit(limit)
-)
+        select(Todo)
+        .where(and_(*filters))
+        # Order by completed asc (incomplete first), then created_at desc (newest first)
+        .order_by(Todo.completed.asc(), Todo.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .options(selectinload(Todo.tags))
+    )
     result = await db.execute(query)
     todos = list(result.scalars().all())
 
-    # Count total
-    count_query = select(func.count()).select_from(Todo).where(Todo.user_id == user_id)
+    count_query = (
+        select(func.count())
+        .select_from(Todo)
+        .where(and_(*filters))
+    )
     total = await db.execute(count_query)
 
     return todos, total.scalar_one()
 
 
 async def get_todo_by_id(db: AsyncSession, todo_id: uuid.UUID) -> Todo | None:
-    result = await db.execute(select(Todo).where(Todo.id == todo_id))
+    result = await db.execute(
+        select(Todo)
+        .where(Todo.id == todo_id)
+        .options(selectinload(Todo.tags))
+    )
     return result.scalar_one_or_none()
 
 

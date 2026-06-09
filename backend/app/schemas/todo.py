@@ -15,6 +15,15 @@ class TodoUpdate(BaseModel):
     completed: bool | None = None
 
 
+class TagInTodo(BaseModel):
+    """Minimal tag info embedded in todo response."""
+    id: uuid.UUID
+    name: str
+    color: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class TodoResponse(BaseModel):
     id: uuid.UUID
     title: str
@@ -24,6 +33,7 @@ class TodoResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     user_email: str | None = None
+    tags: list[TagInTodo] = []
 
     model_config = {"from_attributes": True}
 
@@ -33,3 +43,9 @@ class TodoListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class BulkStatusUpdate(BaseModel):
+    """Payload for bulk updating todo status."""
+    todo_ids: list[uuid.UUID] = Field(..., min_length=1)
+    completed: bool
